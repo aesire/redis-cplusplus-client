@@ -2836,13 +2836,13 @@ namespace redis
   };
   
   typedef distributed_base_int<short>           distributed_short;
-  typedef distributed_base_int<ushort>          distributed_ushort;
+  typedef distributed_base_int<unsigned short>  distributed_ushort;
   
   typedef distributed_base_int<int>             distributed_int;
-  typedef distributed_base_int<uint>            distributed_uint;
+  typedef distributed_base_int<unsigned int>    distributed_uint;
   
   typedef distributed_base_int<long>            distributed_long;
-  typedef distributed_base_int<ulong>           distributed_ulong;
+  typedef distributed_base_int<unsigned long>   distributed_ulong;
 
   // TODO: lexical_cast treats int8_t/uint8_t as char/uchar
   //typedef distributed_base_int<boost::int8_t>   distributed_int8;
