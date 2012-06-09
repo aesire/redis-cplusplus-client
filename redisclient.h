@@ -67,7 +67,7 @@
 #define REDIS_PREFIX_INT_REPLY          ':'
 #define REDIS_WHITESPACE                " \f\n\r\t\v"
 
-template<class Object >
+template<class Object>
 struct make;
 namespace redis 
 {
@@ -415,6 +415,7 @@ namespace redis
     typedef std::pair<string_type, double> string_score_pair;
     typedef std::vector<string_score_pair> string_score_vector;
     typedef std::set<string_type> string_set;
+    typedef std::map<string_type, string_type> string_map;
 
     typedef long int_type;
 
@@ -1818,6 +1819,19 @@ namespace redis
       recv_ok_reply_(socket);
     }
     
+    void hmset( const string_type & key, const string_map & map )
+    {
+      int socket = get_socket(key);
+      makecmd m("HMSET");
+      m << key;
+      
+      BOOST_FOREACH(const string_pair & pair, map)
+        m << pair.first << pair.second;
+      
+      send_(socket, m);
+      recv_ok_reply_(socket);
+    }
+    
     void hmget( const string_type & key, const string_vector & fields, string_vector & out)
     {
       int socket = get_socket(key);
@@ -1881,6 +1895,13 @@ namespace redis
       recv_multi_bulk_reply_(socket, s);
       for(size_t i = 0; i < s.size(); i+=2)
         out.push_back( make_pair(s[i], s[i+1]) );
+    }
+    
+    void hgetall( const string_type & key, string_map & out )
+    {
+      int socket = get_socket(key);
+      send_(socket, makecmd("HGETALL") << key);
+      recv_multi_bulk_reply_(socket, out);
     }
     
     void select(int_type dbindex)
@@ -2320,6 +2341,24 @@ namespace redis
       
       for (int_type i = 0; i < length; ++i)
         out.insert(recv_bulk_reply_(socket));
+      
+      return length;
+    }
+    
+    int_type recv_multi_bulk_reply_(int socket, string_map & out)
+    {
+      int_type length = recv_bulk_reply_(socket, REDIS_PREFIX_MULTI_BULK_REPLY);
+      
+      if (length == -1)
+        throw key_error("no such key");
+      
+      for (int_type i = 0; i < length / 2; ++i)
+      {
+        std::string key = recv_bulk_reply_(socket);
+        std::string val = recv_bulk_reply_(socket);
+        
+        out[key] = val;
+      }
       
       return length;
     }

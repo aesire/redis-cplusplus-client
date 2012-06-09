@@ -31,13 +31,18 @@ void test_hashes(redis::client & c)
   }
   
   redis::client::string_pair_vector content;
+  redis::client::string_map content_map;
   test("hmset");
   {
     content.push_back( make_pair("key1", "hval1") );
     content.push_back( make_pair("key2", "hval2") );
     content.push_back( make_pair("key3", "hval3") );
     
+    content_map["key5"] = "hval5";
+    content_map["key6"] = "hval6";
+    
     c.hmset("hash2", content);
+    c.hmset("hash3", content_map);
   }
   
   test("hmget");
@@ -50,7 +55,7 @@ void test_hashes(redis::client & c)
     
     redis::client::string_vector content2;
     c.hmget("hash2", fields, content2);
-    ASSERT_EQUAL(content2.size(), (size_t) 4);
+    ASSERT_EQUAL(content2.size(), fields.size());
     
     for(size_t i=0; i<content2.size(); i++)
     {
@@ -59,55 +64,68 @@ void test_hashes(redis::client & c)
       else
         ASSERT_EQUAL( content2[i], redis::client::missing_value() );
     }
+    
+    fields.clear();
+    fields.push_back("key5");
+    fields.push_back("key6");
+    
+    content2.clear();
+    c.hmget("hash3", fields, content2);
+    ASSERT_EQUAL(content2.size(), fields.size());
+    
+    for(size_t i=0; i<fields.size(); i++)
+    {
+      ASSERT_EQUAL( content2[i], content_map[fields[i]] );
+    }
   }
   
   test("hincrby");
   {
-    c.hset("hash3", "key1", "1");
+    c.hset("hash4", "key1", "1");
     long l;
-    l = c.hincrby("hash3", "key1", 1);
+    l = c.hincrby("hash4", "key1", 1);
     ASSERT_EQUAL( l, 2L );
-    l = c.hincrby("hash3", "key2", 1);
+    l = c.hincrby("hash4", "key2", 1);
     ASSERT_EQUAL( l, 1L );
-    l = c.hincrby("hash3", "key3", -3);
+    l = c.hincrby("hash4", "key3", -3);
     ASSERT_EQUAL( l, -3L );
 
     string s;
-    s = c.hget("hash3", "key1");
+    s = c.hget("hash4", "key1");
     ASSERT_EQUAL( s, string("2") );
-    s = c.hget("hash3", "key2" );
+    s = c.hget("hash4", "key2" );
     ASSERT_EQUAL( s, string("1") );
-    s = c.hget("hash3", "key3" );
+    s = c.hget("hash4", "key3" );
     ASSERT_EQUAL( s, string("-3") );
   }
   
   test("hexists");
   {
-    ASSERT_EQUAL( c.hexists("hash3", "key1"), true );
-    ASSERT_EQUAL( c.hexists("hash3", "key4"), false );
+    ASSERT_EQUAL( c.hexists("hash4", "key1"), true );
+    ASSERT_EQUAL( c.hexists("hash4", "key4"), false );
   }
   
   test("hdel");
   {
-    ASSERT_EQUAL( c.hdel("hash3", "key1"), true );
-    ASSERT_EQUAL( c.hexists("hash3", "key1"), false );
+    ASSERT_EQUAL( c.hdel("hash4", "key1"), true );
+    ASSERT_EQUAL( c.hexists("hash4", "key1"), false );
     
-    ASSERT_EQUAL( c.hdel("hash3", "key4"), false );
-    ASSERT_EQUAL( c.hexists("hash3", "key4"), false );
+    ASSERT_EQUAL( c.hdel("hash4", "key4"), false );
+    ASSERT_EQUAL( c.hexists("hash4", "key4"), false );
     
-    c.hset("hash3", "key1", "hval1");
+    c.hset("hash4", "key1", "hval1");
   }
   
   test("hlen");
   {
-    ASSERT_EQUAL( c.hlen("hash3"), 3L );
-    ASSERT_EQUAL( c.hlen("hash4"), 0L );
+    ASSERT_EQUAL( c.hlen("hash4"), 3L );
+    ASSERT_EQUAL( c.hlen("hash5"), 0L );
   }
   
   test("hkeys");
   {
     redis::client::string_vector fields;
-    c.hkeys("hash3", fields);
+    c.hkeys("hash4", fields);
     ASSERT_EQUAL( fields.size(), (size_t) 3 );
     std::sort(fields.begin(), fields.end());
     ASSERT_EQUAL( fields[0], string("key1") );
@@ -145,5 +163,12 @@ void test_hashes(redis::client & c)
     
     ASSERT_EQUAL( entries[3].first, string("key4") );
     ASSERT_EQUAL( entries[3].second, string("hval4") );
+    
+    redis::client::string_map entries2;
+    c.hgetall("hash3", entries2);
+    ASSERT_EQUAL( entries2.size(), (size_t) 2 );
+    
+    ASSERT_EQUAL( entries2["key5"], string("hval5") );
+    ASSERT_EQUAL( entries2["key6"], string("hval6") );
   }
 }
