@@ -57,7 +57,6 @@ void test_distributed_strings(redis::client & c)
     ASSERT_EQUAL(sh_str1.setnx("asdf"), true);
     ASSERT_EQUAL(sh_str1.setnx("asdf123"), false);
     
-    cerr << "Time to life of 'sh_str1': " << sh_str1.ttl() << endl;
     ASSERT_EQUAL(sh_str1.ttl(), -1);
     sh_str1.expire(100);
     int ttl = sh_str1.ttl();
