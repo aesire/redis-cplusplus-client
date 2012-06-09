@@ -1267,14 +1267,15 @@ namespace redis
       }
       catch(key_error & e)
       {
+        // should we throw a timeout_error?
+        // we set a timeout so we expect that this can happen
         assert(timeout_seconds > 0);
-        return missing_value(); // should we throw a timeout_error?
-                                // we set a timeout so we expect that this can happen
+        return make_pair( "", missing_value() );
       }
       if(sv.size() == 2)
         return make_pair( sv[0], sv[1] );
       else
-        return make_pair( "", missing_value );
+        return make_pair( "", missing_value() );
     }
     
     string_type brpop(const string_type & key, int_type timeout_seconds)
