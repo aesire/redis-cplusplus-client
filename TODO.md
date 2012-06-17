@@ -1,17 +1,17 @@
-
 command handlers:
 - find a useable concept for MULTI/EXEC transactions (and implement it)
 - support SUBSCRIBE/PUBLISH commands
 - provide template methods (iterator based) for all container based calls
 - deliver the error messages from redis-server in thrown exceptions
-- configureable behavour in sharded mode, if keys are not on the same server
+- configureable behavior in sharded mode, if keys are not on the same server
 - use slave servers 
 
 unit tests:
 - sort with limit
 - sort lexicographically
 - sort with pattern and weights
-- check test couverage with a tool like gcov
+- migrate test cases to googletest
+- check test coverage with a tool like gcov
 
 extras:
 - streaming versions for multi-bulk commands (and maybe also for GET and SET for better support of very large values)
