@@ -2348,7 +2348,7 @@ namespace redis
       
       if (line.find(REDIS_PREFIX_STATUS_REPLY_ERROR) == 0)
       {
-        std::string error_msg = line.substr( strlen(REDIS_PREFIX_STATUS_REPLY_ERROR) );
+        std::string error_msg = line.substr(strlen(REDIS_PREFIX_STATUS_REPLY_ERROR));
         if (error_msg.empty())
           error_msg = "unknown error";
         throw protocol_error(error_msg);
@@ -2373,11 +2373,18 @@ namespace redis
 #ifndef NDEBUG
       //output_proto_debug(line);
 #endif
+
+      if (line.find(REDIS_PREFIX_STATUS_REPLY_ERROR) == 0)
+      {
+        std::string error_msg = line.substr(strlen(REDIS_PREFIX_STATUS_REPLY_ERROR));
+        if (error_msg.empty())
+          error_msg = "unknown error";
+        throw protocol_error(error_msg);
+      }
       
       if (line[0] != prefix)
       {
 #ifndef NDEBUG
-        std::cerr << line << std::endl;
         std::cerr << "unexpected prefix for bulk reply (expected '" << prefix << "' but got '" << line[0] << "')" << std::endl;
 #endif // NDEBUG
         throw protocol_error("unexpected prefix for bulk reply");
