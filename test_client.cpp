@@ -14,6 +14,7 @@ void test_sets(redis::client & c);
 void test_zsets(redis::client & c);
 void test_hashes(redis::client & c);
 void test_generic(redis::client & c);
+void test_pubsub(redis::client & c);
 
 // High level API
 void test_distributed_strings(redis::client & c);
@@ -324,6 +325,8 @@ int main()
     //test_distributed_mutexes(c);
     
     test_generic(c);
+    
+    test_pubsub(c);
     
     benchmark(c, 10000);
 

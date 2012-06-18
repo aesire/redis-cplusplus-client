@@ -10,6 +10,7 @@ using namespace std;
 #define ASSERT_EQUAL(x,y) assert_equal(x, y, __LINE__)
 #define ASSERT_NOT_EQUAL(x,y) assert_not_equal(x, y, __LINE__)
 #define ASSERT_GT(x,y) assert_gt(x, y, __LINE__)
+#define FAIL() cerr << "FAIL at line " << __LINE__ << endl; exit(1);
 
 template <typename T>
 void assert_equal(const T & actual, const T & expected, int lineno)

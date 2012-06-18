@@ -42,12 +42,13 @@
 #include <ctime>
 #include <sstream>
 
-#include <boost/concept_check.hpp>
+#include <boost/bind.hpp>
+#include <boost/ref.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/function.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/random.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
@@ -393,6 +394,10 @@ namespace redis
   class base_client
   {
   private:
+    std::vector<connection_data> connections_;
+    CONSISTENT_HASHER hasher_;
+    bool subscribe_loop_is_running_;
+    
     void init(connection_data & con)
     {
       char err[ANET_ERR_LEN];
@@ -400,11 +405,12 @@ namespace redis
       if (con.socket == ANET_ERR)
       {
         std::ostringstream os;
-        os << err << " (redis://" << con.host << ':' << con.port << ")";
+        os << err << " (redis://" << con.host << ':' << con.port << ')';
         throw connection_error( os.str() );
       }
       anetTcpNoDelay(NULL, con.socket);
       select(con.dbindex, con);
+      subscribe_loop_is_running_ = false;
     }
     
   public:
@@ -521,8 +527,7 @@ namespace redis
       recv_ok_reply_(socket);
     }
     
-    void set(const string_type & key,
-                          const string_type & value)
+    void set(const string_type & key, const string_type & value)
     {
       int socket = get_socket(key);
       send_(socket, makecmd("SET") << key << value);
@@ -630,7 +635,6 @@ namespace redis
         recv_ok_reply_(sp.first);
         for(size_t i= 0; i < sp.second.count; i++)
           recv_int_ok_reply_(sp.first);
-        
       }
     }
     
@@ -756,8 +760,7 @@ namespace redis
       }
     }
     
-    bool setnx(const string_type & key,
-                            const string_type & value)
+    bool setnx(const string_type & key, const string_type & value)
     {
       int socket = get_socket(key);
       send_(socket, makecmd("SETNX") << key << value);
@@ -2206,27 +2209,117 @@ namespace redis
     {
       info(connections_[0], out);
     }
+    
+    class subscriber
+    {
+    public:
+      virtual void subscribe(base_client& c, const string_type& ch, int subscriptions)
+      {}
+      virtual void message(base_client& c, const string_type& ch, const string_type& msg)
+      {}
+      virtual void unsubscribe(base_client& c, const string_type& ch, int subscriptions)
+      {}
+    };
 
+    private:
+      typedef boost::function<void ()> unsubscribe_callback;
+      typedef boost::function<void ()> subscribe_callback;
+      typedef std::map<std::string, subscriber*> subscriber_map;
+      
+      subscriber_map subscriptions_;
+      
+      std::vector<unsubscribe_callback> unsubscribes_;
+      std::vector<subscribe_callback> subscribes_;
+    
+  public:
     int_type publish(const string_type & channel, const string_type & message)
     {
-      int socket = get_socket(channel);
+      int socket = connections_[0].socket;
       send_(socket, makecmd("PUBLISH") << channel << message);
       return recv_int_reply_(socket);
     }
-
-#if 0 // currently unuseable
-    struct subscription_t
+    
+    void subscribe(const string_vector& channels, subscriber& sub)
     {
-      string_type channel;
-      boost::function<void (const string_type &)> callback;
-    };
-
-    void subscribe(const string_type & channel)
-    {
-      int socket = get_socket(channel);
+      int socket = connections_[0].socket;
+      send_(socket, makecmd("SUBSCRIBE") << channels);
       
+      std::vector<string_type> reply;
+      
+      for (unsigned i = 0; i < channels.size(); i++)
+      {
+        recv_multi_bulk_and_int_reply_(socket, reply);
+        
+        std::string& channel = reply[(i*2)+1];
+        subscriptions_[channel] = &sub;
+
+        subscribes_.push_back(boost::bind(&subscriber::subscribe,
+                                          &sub,
+                                          boost::ref(*this),
+                                          channel,
+                                          subscriptions_.size()));
+      }
+      
+      BOOST_FOREACH(subscribe_callback& subscribe, subscribes_)
+        subscribe();
+      
+      subscribes_.clear();
+      
+      BOOST_FOREACH(unsubscribe_callback& unsubscribe, unsubscribes_)
+        unsubscribe();
+      
+      unsubscribes_.clear();
+      
+      if (subscribe_loop_is_running_) return;
+      subscribe_loop_is_running_ = true;
+      
+      while (!subscriptions_.empty())
+      {
+        reply.clear();
+        recv_multi_bulk_reply_(socket, reply);
+        std::string& channel = reply[1];
+        
+        subscriber *sub = subscriptions_[channel];
+        
+        sub->message(*this, channel, reply[2]);
+
+        BOOST_FOREACH(unsubscribe_callback& unsubscribe, unsubscribes_)
+          unsubscribe();
+        
+        unsubscribes_.clear();
+      }
+      
+      subscribe_loop_is_running_ = false;
     }
-#endif // 0 // currently unuseable
+    
+    int unsubscribe(const string_vector& channels)
+    {
+      int socket = connections_[0].socket;
+      send_(socket, makecmd("UNSUBSCRIBE") << channels);
+      
+      std::vector<string_type> reply;
+      
+      int replies = channels.empty() ? subscriptions_.size() : channels.size();
+      for (int i = 0; i < replies; i++)
+      {
+        recv_multi_bulk_and_int_reply_(socket, reply);
+        std::string& channel = reply[(i*2)+1];
+                
+        typename subscriber_map::iterator it = subscriptions_.find(channel);
+        if (it != subscriptions_.end())
+        {
+          subscriber *sub = it->second;
+          unsubscribes_.push_back(boost::bind(&subscriber::unsubscribe,
+                                              sub,
+                                              boost::ref(*this),
+                                              channel,
+                                              subscriptions_.size()-1));
+          subscriptions_.erase(it);
+        }
+      }
+      
+      return subscriptions_.size();
+    }
     
   private:
     base_client(const base_client &);
@@ -2284,6 +2377,7 @@ namespace redis
       if (line[0] != prefix)
       {
 #ifndef NDEBUG
+        std::cerr << line << std::endl;
         std::cerr << "unexpected prefix for bulk reply (expected '" << prefix << "' but got '" << line[0] << "')" << std::endl;
 #endif // NDEBUG
         throw protocol_error("unexpected prefix for bulk reply");
@@ -2294,7 +2388,7 @@ namespace redis
     
     std::string recv_bulk_reply_(int socket)
     {
-      int_type length = recv_bulk_reply_(socket, REDIS_PREFIX_SINGLE_BULK_REPLY );
+      int_type length = recv_bulk_reply_(socket, REDIS_PREFIX_SINGLE_BULK_REPLY);
       
       if (length == -1)
         return missing_value();
@@ -2403,6 +2497,26 @@ namespace redis
     {
       if (recv_int_reply_(socket) != 1)
         throw protocol_error("expecting int reply of 1");
+    }
+    
+    // for the subscribe command
+    int_type recv_multi_bulk_and_int_reply_(int socket, string_vector & out)
+    {
+      int_type length = recv_bulk_reply_(socket, REDIS_PREFIX_MULTI_BULK_REPLY);
+      
+      if (length == -1)
+        throw protocol_error("unexpected int reply; -1");
+      
+      int_type real_length = length - 1;
+
+      out.reserve( out.size()+real_length );
+      
+      for (int_type i = 0; i < real_length; ++i)
+        out.push_back(recv_bulk_reply_(socket));
+      
+      recv_int_reply_(socket);
+      
+      return length;
     }
     
     inline int get_socket(const string_type & key)
@@ -2613,11 +2727,6 @@ namespace redis
       std::string line = oss.str();
       return rtrim(line, REDIS_LBR);
     }
-    
-  private:
-    std::vector<connection_data> connections_;
-    //int socket_;
-    CONSISTENT_HASHER hasher_;
   };
   
   struct default_hasher
