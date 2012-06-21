@@ -2848,6 +2848,16 @@ namespace redis
       return *this;
     }
 
+    bool operator==(const redis::client::string_type & str) const
+    {
+      return this->str() == str;
+    }
+
+    bool operator!=(const redis::client::string_type & str) const
+    {
+      return this->str() != str;
+    }
+
     distributed_string & operator=(const client::string_type & value)
     {
       client_conn_->set(key(), value);
@@ -2860,6 +2870,19 @@ namespace redis
         *this = other_str.str();
       
       return *this;
+    }
+
+    friend std::ostream& operator<<(std::ostream & os, const redis::distributed_string & sh_str)
+    {
+      return os << sh_str.str();
+    }
+
+    friend std::istream& operator>>(std::istream & is, redis::distributed_string & sh_str)
+    {
+      redis::client::string_type s_val;
+      is >> s_val;
+      sh_str = s_val;
+      return is;
     }
 
     client::string_type getset(const client::string_type & new_value)
@@ -3321,31 +3344,6 @@ namespace redis
     {
     }
   };
-}
-
-inline bool operator==(const redis::distributed_string & sh_str, const redis::client::string_type & str)
-{
-  return sh_str.str() == str;
-}
-
-inline bool operator!=(const redis::distributed_string & sh_str, const redis::client::string_type & str)
-{
-  return sh_str.str() != str;
-}
-
-template <typename ch, typename char_traits>
-std::basic_ostream<ch, char_traits>& operator<<(std::basic_ostream<ch, char_traits> & os, const redis::distributed_string & sh_str)
-{
-  return os << sh_str.str();
-}
-
-template <typename ch, typename char_traits>
-std::basic_istream<ch, char_traits>& operator>>(std::basic_istream<ch, char_traits> & is, redis::distributed_string & sh_str)
-{
-  redis::client::string_type s_val;
-  is >> s_val;
-  sh_str = s_val;
-  return is;
 }
 
 #endif // REDISCLIENT_H

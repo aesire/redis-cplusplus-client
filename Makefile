@@ -4,7 +4,8 @@ VPATH = tests
 
 #CFLAGS?= -pedantic -O2 -Wall -DNEBUG -W
 CFLAGS?= -pedantic -O0 -W -DDEBUG -g
-CC = g++
+#CC = g++
+CC = clang++
 
 CLIENTOBJS = anet.o
 LIBNAME = libredisclient.a
