@@ -3,7 +3,7 @@
 VPATH = tests
 
 #CFLAGS?= -pedantic -O2 -Wall -DNEBUG -W
-CFLAGS?= -pedantic -O0 -W -DDEBUG -g
+CFLAGS?= -pedantic -O0 -W -DDEBUG -g -std=c++11 -stdlib=libc++
 #CC = g++
 CC = clang++
 
@@ -12,7 +12,7 @@ LIBNAME = libredisclient.a
 
 TESTAPP = test_client
 TESTAPPOBJS = test_client.o test_lists.o test_sets.o test_zsets.o test_hashes.o test_cluster.o test_pubsub.o test_distributed_strings.o test_distributed_ints.o test_distributed_mutexes.o test_generic.o benchmark.o functions.o
-TESTAPPLIBS = $(LIBNAME) -lstdc++ -lpthread -lboost_thread-mt
+TESTAPPLIBS = $(LIBNAME) -lc++ -lpthread -lboost_thread-mt
 
 all: $(LIBNAME) $(TESTAPP)
 

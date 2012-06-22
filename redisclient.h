@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <stdexcept>
 #include <ctime>
@@ -421,7 +422,7 @@ namespace redis
     typedef std::pair<string_type, double> string_score_pair;
     typedef std::vector<string_score_pair> string_score_vector;
     typedef std::set<string_type> string_set;
-    typedef std::map<string_type, string_type> string_map;
+    typedef std::unordered_map<string_type, string_type> string_map;
 
     typedef long int_type;
 
@@ -2224,7 +2225,7 @@ namespace redis
     private:
       typedef boost::function<void ()> unsubscribe_callback;
       typedef boost::function<void ()> subscribe_callback;
-      typedef std::map<std::string, subscriber*> subscriber_map;
+      typedef std::unordered_map<std::string, subscriber*> subscriber_map;
       
       subscriber_map subscriptions_;
       
